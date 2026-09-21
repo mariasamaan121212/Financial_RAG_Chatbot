@@ -3,7 +3,8 @@ langchain
 langchain-community
 langchain-groq
 langchain-huggingface
-pypdf
 faiss-cpu
-groq
+pypdf
 sentence-transformers
+groq
+plotly
