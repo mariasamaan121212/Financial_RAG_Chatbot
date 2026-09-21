@@ -125,7 +125,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Dynamic Analysis Function for Any Uploaded Document
-@st.cache_data(show_spinner="Extracting dynamic metrics and summary from document...")
+
 def generate_dynamic_insights(_vectorstore, model_name):
     retriever = _vectorstore.as_retriever(search_kwargs={"k": 5})
     docs = retriever.invoke("summary key metrics statistics numbers results revenue profit performance highlights")
