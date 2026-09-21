@@ -1,5 +1,7 @@
 import os
 import tempfile
+import json
+import re
 import streamlit as st
 import plotly.graph_objects as go
 from groq import Groq
@@ -13,8 +15,8 @@ from langchain_core.output_parsers import StrOutputParser
 
 # Page Configuration
 st.set_page_config(
-    page_title="Tesla Financial AI Intelligence",
-    page_icon="🚘",
+    page_title="Universal Document AI Intelligence",
+    page_icon="📊",
     layout="wide"
 )
 
@@ -58,21 +60,18 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
-    .quick-btn {
-        margin-bottom: 10px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # Hero Header
 st.markdown("""
-<div class="header-title">🚘 Tesla Financial AI RAG Intelligence</div>
-<p style="color: #94A3B8; font-size: 15px;">Enterprise-grade Financial Document Analysis powered by Groq & Vector Search</p>
+<div class="header-title">📊 Universal AI Document Intelligence Engine</div>
+<p style="color: #94A3B8; font-size: 15px;">Enterprise-grade Multi-Document Analytics powered by Groq & Dynamic Vector Search</p>
 <div>
     <span class="badge-red">⚡ Groq Ultra-Fast</span>
     <span class="badge-blue">🔍 FAISS Vector Store</span>
-    <span class="badge-blue">🦜🔗 LangChain LCEL</span>
-    <span class="badge-red">📊 Plotly Analytics</span>
+    <span class="badge-blue">🦜🔗 Dynamic RAG</span>
+    <span class="badge-red">📊 Plotly Dynamic Charts</span>
 </div>
 <br>
 """, unsafe_allow_html=True)
@@ -80,13 +79,13 @@ st.markdown("""
 # Sidebar Setup
 st.sidebar.markdown("### ⚙️ System Control")
 groq_api_key = st.sidebar.text_input("Groq API Key", type="password", help="Enter your Groq API Key")
-uploaded_file = st.sidebar.file_uploader("Upload Financial PDF", type=["pdf"])
+uploaded_file = st.sidebar.file_uploader("Upload Any PDF Document", type=["pdf"])
 
 st.sidebar.markdown("---")
 st.sidebar.caption("🔒 Document context is strictly bounded to prevent AI hallucinations.")
 
 # Cache PDF Indexing Process
-@st.cache_resource(show_spinner="Indexing financial document into vector database...")
+@st.cache_resource(show_spinner="Indexing document into vector database...")
 def process_pdf(file_bytes, filename):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(file_bytes)
@@ -125,22 +124,72 @@ def get_active_model(api_key):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Function to Render Interactive Plotly Chart
-def render_financial_chart():
-    categories = ['2023 Total Revenues', '2024 Total Revenues', '2023 Gross Profit', '2024 Gross Profit']
-    values = [96.77, 97.69, 17.66, 17.45] # In Billions USD from Tesla filings
+# Dynamic Analysis Function for Any Uploaded Document
+@st.cache_data(show_spinner="Extracting dynamic metrics and summary from document...")
+def generate_dynamic_insights(_vectorstore, model_name):
+    retriever = _vectorstore.as_retriever(search_kwargs={"k": 5})
+    docs = retriever.invoke("summary key metrics statistics numbers results revenue profit performance highlights")
+    context = "\n\n".join(doc.page_content for doc in docs)
+
+    llm = ChatGroq(model=model_name, temperature=0)
+
+    prompt = f"""
+    Analyze the provided document context and produce a JSON response with two keys:
+    1. "summary": List of 4 concise bullet points summarizing key findings.
+    2. "metrics": List of up to 4 key numerical data points found in the document for plotting on a bar chart. Each item must be an object with "label" (string) and "value" (number float/int). Convert billion/million values to standard float numbers (e.g. 97.69).
+
+    STRICT REQUIREMENT: Respond strictly with valid JSON only. Format:
+    {{
+      "summary": ["Bullet 1", "Bullet 2", "Bullet 3", "Bullet 4"],
+      "metrics": [
+        {{"label": "Metric Name 1", "value": 100.5}},
+        {{"label": "Metric Name 2", "value": 85.2}}
+      ]
+    }}
+
+    Document Context:
+    {context}
+    """
+
+    res = llm.invoke(prompt)
+    
+    try:
+        json_match = re.search(r'\{.*\}', res.content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception:
+        pass
+        
+    return {
+        "summary": [
+            "Document successfully indexed.",
+            "Ready for context-aware Q&A.",
+            "Ask specific questions using the chat console.",
+            "Source citations available for all generated answers."
+        ],
+        "metrics": []
+    }
+
+# Render Dynamic Plotly Chart
+def render_dynamic_chart(metrics_data):
+    if not metrics_data:
+        st.info("ℹ️ No specific numerical metrics auto-extracted for charting. You can query numbers directly in chat!")
+        return
+
+    labels = [m["label"] for m in metrics_data]
+    values = [m["value"] for m in metrics_data]
 
     fig = go.Figure(data=[
         go.Bar(
-            x=categories,
+            x=labels,
             y=values,
-            marker_color=['#0284C7', '#E82127', '#0284C7', '#E82127'],
-            text=[f"${v}B" for v in values],
+            marker_color=['#0284C7', '#E82127', '#38BDF8', '#F59E0B'][:len(values)],
+            text=[f"{v}" for v in values],
             textposition='auto',
         )
     ])
     fig.update_layout(
-        title="📊 Financial Performance Overview (in Billions USD)",
+        title="📊 Extracted Key Document Metrics",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#F8FAFC'),
@@ -149,7 +198,7 @@ def render_financial_chart():
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# Application Core Logic
+# Main Application Execution
 if uploaded_file and groq_api_key:
     os.environ["GROQ_API_KEY"] = groq_api_key.strip()
     
@@ -158,7 +207,7 @@ if uploaded_file and groq_api_key:
         vectorstore, total_chunks = process_pdf(uploaded_file.getvalue(), uploaded_file.name)
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-        # KPI Dashboard Cards Top Bar
+        # Top KPI Cards
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric(label="📄 Loaded Document", value=uploaded_file.name[:18] + "...")
@@ -169,38 +218,37 @@ if uploaded_file and groq_api_key:
 
         st.markdown("---")
 
-        # Feature 2 & 4: Executive Summary & Plotly Chart Expander
-        with st.expander("📋 Automated Executive Highlights & Financial Charts", expanded=False):
+        # Extract Dynamic Insights for ANY Uploaded File
+        insights = generate_dynamic_insights(vectorstore, active_model)
+
+        # Render Dynamic Executive Summary & Chart Expander
+        with st.expander("📋 Automated Executive Highlights & Dynamic Analytics", expanded=True):
             chart_col, summary_col = st.columns([1.2, 1])
             with chart_col:
-                render_financial_chart()
+                render_dynamic_chart(insights.get("metrics", []))
             with summary_col:
                 st.markdown("#### 🚀 Executive Summary")
-                st.markdown("""
-                * **Revenue Trend:** Revenue reached **$97.69 Billion** in 2024 (up from $96.77B in 2023).
-                * **Gross Profit:** Gross Profit recorded **$17.45 Billion** in 2024.
-                * **Core Sectors:** Energy Storage and Services showed robust double-digit expansion.
-                * **Risk Bounding:** Supply chain fluctuations remain a highlighted focus area.
-                """)
+                for bullet in insights.get("summary", []):
+                    st.markdown(f"* {bullet}")
 
-        # Feature 3: Quick Prompt Buttons
-        st.markdown("##### ⚡ Quick Financial Prompts")
+        # Universal Quick Prompt Buttons
+        st.markdown("##### ⚡ Quick Document Prompts")
         btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
         selected_prompt = None
 
-        if btn_col1.button("💵 Revenues 2024 vs 2023"):
-            selected_prompt = "What was Tesla's total revenues in 2024 compared to 2023?"
-        if btn_col2.button("🚗 Total Deliveries"):
-            selected_prompt = "How many total vehicles did Tesla produce and deliver in 2024?"
-        if btn_col3.button("🔬 R&D Spending"):
-            selected_prompt = "How much did Tesla spend on Research and Development (R&D) in 2024?"
-        if btn_col4.button("⚠️ Supply Chain Risks"):
-            selected_prompt = "What are the primary risk factors mentioned regarding battery supply chain?"
+        if btn_col1.button("📋 Executive Summary"):
+            selected_prompt = "Provide a comprehensive summary of the main points in this document."
+        if btn_col2.button("🔑 Key Highlights"):
+            selected_prompt = "What are the key findings, metrics, and highlights in this document?"
+        if btn_col3.button("📊 Financial & Stat Figures"):
+            selected_prompt = "List all major financial or statistical figures mentioned in this document."
+        if btn_col4.button("⚠️ Risk Factors & Challenges"):
+            selected_prompt = "What are the main risks, challenges, or limitations discussed in this file?"
 
         llm = ChatGroq(model=active_model, temperature=0)
 
-        template = """You are an expert AI financial analyst. Answer the user's question 
-accurately using ONLY the provided context from the financial document. 
+        template = """You are an expert AI document analyst. Answer the user's question 
+accurately using ONLY the provided context from the document. 
 If the answer is not contained within the context, clearly state that 
 the information is not available in the document.
 
@@ -223,8 +271,8 @@ Answer:"""
                             st.markdown(f"**Source {idx+1} (Page {page_num}):**")
                             st.caption(doc.page_content)
 
-        # Determine user input (either typed or button clicked)
-        typed_query = st.chat_input("Ask any financial question about this document...")
+        # Query handling
+        typed_query = st.chat_input("Ask any question about this document...")
         user_query = typed_query if typed_query else selected_prompt
 
         if user_query:
@@ -233,8 +281,7 @@ Answer:"""
                 st.markdown(user_query)
 
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing metrics and retrieving page context..."):
-                    # Feature 1: Retrieve Documents with Metadata for Source Citation
+                with st.spinner("Analyzing document context..."):
                     retrieved_docs = retriever.invoke(user_query)
                     formatted_context = "\n\n".join(doc.page_content for doc in retrieved_docs)
                     
@@ -243,7 +290,6 @@ Answer:"""
                     
                     st.markdown(response)
                     
-                    # Display Citation Expander
                     with st.expander("📚 View Document Sources & Citation"):
                         for idx, doc in enumerate(retrieved_docs):
                             page_num = doc.metadata.get("page", 0) + 1
@@ -260,4 +306,4 @@ Answer:"""
         st.error(f"An error occurred: {str(e)}")
 
 else:
-    st.info("👈 Please enter your Groq API Key and upload a PDF document in the sidebar to launch the analysis console.")
+    st.info("👈 Please enter your Groq API Key and upload any PDF document in the sidebar to launch the analysis console.")
